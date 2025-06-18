@@ -40,7 +40,7 @@
 			border-color: yellow;
 		}
 		.top-bar {
-			width: 70%;
+			width: 80%;
 			height: 30px;
 			background: rgb(0, 0, 0);
 			display: flex;
@@ -52,12 +52,12 @@
 			margin: 10px auto;
 		}
 		.sensor-values {
-			font-size: 12px;
+			font-size: 20px;
 			color: grey;
 		}
 		.climate-bar {
-			width: 70%;
-			height: 3px;
+			width: 80%;
+			height: 4px;
 			background: linear-gradient(to right, green, yellow, red);
 			position: relative;
 			border-radius: 5px;
@@ -65,9 +65,9 @@
 		}
 		#climate-indicator {
 			position: absolute;
-			top: -15px;
+			top: 5px;
 			left: 50%;
-			transform: translateX(-50%) rotate(180deg);
+			transform: translateX(-50%) rotate(0deg);
 			font-size: 14px;
 			color: white;
 			transition: left 0.8s ease;
@@ -77,13 +77,13 @@
 			padding: 10px 20px;
 		}
 		#screenTime {
-			font-size: 64px;
-			margin-top: 14%;
+			font-size: 94px;
+			margin-top: 12%;
 			align-items: center;
 		}
 		.progress-bar {
-			width: 80%;
-			height: 1dvh;
+			width: 90%;
+			height: 2dvh;
 			background: #444;
 			border-radius: 10px;
 			margin: 10px auto;
@@ -111,7 +111,7 @@
 			position: absolute;
 			bottom: 10px;
 			width: 100%;
-			font-size: 18px;
+			font-size: 25px;
 			color: #ccc;
 		}
 		.buttons {
@@ -216,7 +216,7 @@
 	const PAUSE_INTERVAL_MINUTES = 0.2;
 	const PAUSE_DURATION_MINUTES = 0.1;
 	const UPDATE_INTERVAL_MS = 1000;
-	const DRINK_REMINDER_INTERVAL_MINUTES = 0.2;
+	const DRINK_REMINDER_INTERVAL_MINUTES = 30;
 
 	const BIG_BREAK_AFTER_N_PAUSES = 1;
 	const BIG_BREAK_DURATION_SECONDS = PAUSE_DURATION_MINUTES * 5 * 60;
