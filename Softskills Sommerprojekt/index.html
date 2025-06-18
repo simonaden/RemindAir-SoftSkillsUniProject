@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+	<meta charset="UTF-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+	<title>Bildschirmzeit Tracker</title>
+	<style>
+		body {
+			margin: 0;
+			padding: 0;
+			background: rgb(0, 0, 0);
+			font-family: sans-serif;
+			text-align: center;
+		}
+		.screen-area {
+			width: 800px;
+			height: 480px;
+			background: black;
+			margin: 0 auto;
+			position: relative;
+			color: white;
+			/*box-shadow: 0 0 10px #888; Glow Effect*/
+			font-family: sans-serif;
+			text-align: center;
+			box-sizing: border-box;
+			border: 5px solid black;
+            border-radius: 16px;
+			transition: border-color 0.3s ease;
+		}
+		.screen-area.start-glow {
+			border-radius: 16px;
+			border-color: limegreen;
+		}
+		.screen-area.stopped {
+			border-radius: 16px;
+			border-color: red;
+		}
+		.screen-area.paused {
+			border-radius: 16px;
+			border-color: yellow;
+		}
+		.top-bar {
+			width: 70%;
+			height: 30px;
+			background: rgb(0, 0, 0);
+			display: flex;
+			flex-direction: column;
+			align-items: center;
+			justify-content: center;
+			padding-top: 5px;
+			border-radius: 16px;
+			margin: 10px auto;
+		}
+		.sensor-values {
+			font-size: 12px;
+			color: grey;
+		}
+		.climate-bar {
+			width: 70%;
+			height: 3px;
+			background: linear-gradient(to right, green, yellow, red);
+			position: relative;
+			border-radius: 5px;
+			margin-top: 5px;
+		}
+		#climate-indicator {
+			position: absolute;
+			top: -15px;
+			left: 50%;
+			transform: translateX(-50%) rotate(180deg);
+			font-size: 14px;
+			color: white;
+			transition: left 0.8s ease;
+		}
+		.main-content {
+			text-align: center;
+			padding: 10px 20px;
+		}
+		#screenTime {
+			font-size: 64px;
+			margin-top: 14%;
+			align-items: center;
+		}
+		.progress-bar {
+			width: 80%;
+			height: 1dvh;
+			background: #444;
+			border-radius: 10px;
+			margin: 10px auto;
+			overflow: hidden;
+		}
+		#progressFill {
+			height: 100%;
+			width: 0%;
+			background: #00e676;
+			transition: width 0.5s, background-color 0.5s;
+		}
+		#pauseInfo {
+			margin-top: 10px;
+			font-size: 24px;
+			color: #39ba28;
+			display: none;
+		}
+		#manualPauseInfo {
+			display: none;
+			color: yellow;
+			font-size: 18px;
+			margin-top: 5px;
+		}
+		#totalPauseTimeDisplay {
+			position: absolute;
+			bottom: 10px;
+			width: 100%;
+			font-size: 18px;
+			color: #ccc;
+		}
+		.buttons {
+			margin: 20px auto;
+		}
+		button {
+			margin: 5px;
+			padding: 10px 20px;
+			font-size: 16px;
+		}
+		.alert-icons {
+			position: absolute;
+			top: 10px;
+			right: 15px;
+			display: flex;
+			flex-direction: row;
+			gap: 5px;
+			font-size: 22px;
+		}
+		.alert-icon {
+			color: red;
+		}
+		.popup-overlay {
+			position: fixed;
+			top: 0;
+			left: 0;
+			width: 100vw;
+			height: 100vh;
+			background: rgba(0, 0, 0, 0.85);
+			z-index: 9999;
+			display: flex;
+			align-items: center;
+			justify-content: center;
+		}
+		.popup-content {
+			background: white;
+			color: black;
+			padding: 30px;
+			border-radius: 10px;
+			text-align: center;
+			box-shadow: 0 0 20px #000;
+		}
+	</style>
+</head>
+<!-- Audio files for reminders -->
+<audio id="drinkAudio" src="trink_sound.mp3" preload="none"></audio>
+<audio id="pauseAudio" src="pause_sound2.mp3" preload="none"></audio>
+
+<body>
+	<div class="screen-area">
+		<div class="top-bar">
+			<div class="sensor-values" id="sensorValues">
+				CO₂: <span id="co2">---</span> |
+				Temp: <span id="temp">---</span> |
+				Luftfeuchte: <span id="hum">---</span>
+			</div>
+			<div class="climate-bar" id="climateBar">
+				<div id="climate-indicator">▲</div>
+			</div>
+		</div>
+		<div id="drinkReminderPopup" class="popup-overlay" style="display: none;">
+			<div class="popup-content">
+				<h2>Trinkerinnerung</h2>
+				<p>Bitte trinke jetzt ein Glas Wasser! 💧</p>
+				<button onclick="closeDrinkReminder()">Ich habe getrunken</button>
+			</div>
+		</div>
+		<div id="bigBreakPopup" class="popup-overlay" style="display: none;">
+			<div class="popup-content">
+				<h2>Große Pause!</h2>
+				<p>Beweg dich! Geh an die frische Luft. 🚶‍♂️🌿</p>
+				<button onclick="closeBigBreakPopup()">Ich war draußen</button>
+			</div>
+		</div>
+		<div class="main-content">
+			<div id="screenTime">00h 00min 00s</div>
+			<div class="progress-bar"><div id="progressFill"></div></div>
+			<div id="pauseInfo">
+				Pause: <span id="pauseCountdown">05min 00s</span>
+			</div>
+			<div id="manualPauseInfo">
+				Manuelle Pause seit: <span id="manualPauseTime">00h 00min 00s</span>
+			</div>
+		</div>
+		<div class="alert-icons" id="alertIcons"></div>
+		<div id="totalPauseTimeDisplay">
+			Gesamte Pausenzeit: <span id="totalPauseTime">00h 00min 00s</span>
+		</div>
+	</div>
+	<div class="buttons">
+		<button id="startBtn">Start</button>
+		<button id="pauseBtn">Pause</button>
+		<button id="stopBtn">Stopp</button>
+	</div>
+</body>
+</html>
+
+
+<script>
+	// === KONSTANTEN ===
+	const SHOW_SENSOR_VALUES = true;
+	const PAUSE_INTERVAL_MINUTES = 0.2;
+	const PAUSE_DURATION_MINUTES = 0.1;
+	const UPDATE_INTERVAL_MS = 1000;
+	const DRINK_REMINDER_INTERVAL_MINUTES = 0.2;
+
+	const BIG_BREAK_AFTER_N_PAUSES = 1;
+	const BIG_BREAK_DURATION_SECONDS = PAUSE_DURATION_MINUTES * 5 * 60;
+
+	const CLIMATE_MIN_CO2 = 400;
+	const CLIMATE_MAX_CO2 = 2000;
+	const CO2_LIMIT = 1000;
+	const TEMP_MIN = 18;
+	const TEMP_MAX = 28;
+	const HUM_MIN = 30;
+	const HUM_MAX = 60;
+
+	const PAUSE_INTERVAL_SECONDS = PAUSE_INTERVAL_MINUTES * 60;
+	const PAUSE_DURATION_SECONDS = PAUSE_DURATION_MINUTES * 60;
+	const PAUSE_TEXT_PREFIX = "Pause: ";
+
+	// === VARIABLEN ===
+	let screenSeconds = 0;
+	let isPausedManually = false;
+	let isInAutoPause = false;
+	let isStopped = false;
+	let pauseCountdownSeconds = 0;
+	let totalPauseSeconds = 0;
+	let pauseCount = 0;
+	let manualPauseStartSeconds = null;
+
+	let mainTimer = null;
+	let pauseTimer = null;
+
+	// === DOM ELEMENTE ===
+	const screenTime = document.getElementById('screenTime');
+	const progressFill = document.getElementById('progressFill');
+	const pauseInfo = document.getElementById('pauseInfo');
+	const totalPauseTimeDisplay = document.getElementById('totalPauseTime');
+	const manualPauseInfo = document.getElementById('manualPauseInfo');
+	const screenArea = document.querySelector('.screen-area');
+
+	// === HILFSFUNKTIONEN ===
+	function formatTime(seconds) {
+		const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
+		const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+		const s = String(seconds % 60).padStart(2, '0');
+		return `${h}h ${m}min ${s}s`;
+	}
+
+	function formatPauseTime(seconds) {
+		const m = String(Math.floor(seconds / 60)).padStart(2, '0');
+		const s = String(seconds % 60).padStart(2, '0');
+		return `${m}min ${s}s`;
+	}
+
+	function updateScreenTimeDisplay() {
+		screenTime.textContent = formatTime(screenSeconds);
+	}
+
+	function updateProgressBar() {
+		const percent = Math.min((screenSeconds % PAUSE_INTERVAL_SECONDS) / PAUSE_INTERVAL_SECONDS * 100, 100);
+		progressFill.style.width = `${percent}%`;
+		progressFill.style.backgroundColor =
+			percent < 50 ? '#00e676' :
+			percent < 80 ? '#ffeb3b' : '#f44336';
+	}
+
+	function updateTotalPauseDisplay() {
+		totalPauseTimeDisplay.textContent = formatTime(totalPauseSeconds);
+	}
+
+	function updatePauseDisplay() {
+		pauseInfo.innerHTML = PAUSE_TEXT_PREFIX + '<span id="pauseCountdown">' + formatPauseTime(pauseCountdownSeconds) + '</span>';
+	}
+
+	function updateStoppedBorder() {
+		screenArea.classList.toggle('stopped', isStopped);
+	}
+
+	function triggerStartGlow() {
+		screenArea.classList.add('start-glow');
+		setTimeout(() => screenArea.classList.remove('start-glow'), 600);
+	}
+
+	// === TIMER ===
+	function startMainTimer() {
+		if (mainTimer) return;
+		mainTimer = setInterval(() => {
+			if (!isPausedManually && !isInAutoPause && !isStopped) {
+				screenSeconds++;
+				updateScreenTimeDisplay();
+				updateProgressBar();
+				if (screenSeconds > 0 && screenSeconds % PAUSE_INTERVAL_SECONDS === 0) {
+					startAutoPause();
+				}
+			}
+
+			if (isPausedManually && !isStopped) {
+				totalPauseSeconds++;
+				updateTotalPauseDisplay();
+				if (manualPauseStartSeconds !== null) {
+					const elapsed = totalPauseSeconds - manualPauseStartSeconds;
+					document.getElementById('manualPauseTime').textContent = formatTime(elapsed);
+				}
+			}
+		}, UPDATE_INTERVAL_MS);
+	}
+
+	function stopMainTimer() {
+		clearInterval(mainTimer);
+		mainTimer = null;
+	}
+
+	function startAutoPause() {
+		pauseCount++;
+		const isBigBreak = pauseCount >= BIG_BREAK_AFTER_N_PAUSES;
+		if (isBigBreak) {
+			pauseCount = 0;
+			showBigBreakPopup();
+		}
+
+		isInAutoPause = true;
+		pauseCountdownSeconds = isBigBreak ? BIG_BREAK_DURATION_SECONDS : PAUSE_DURATION_SECONDS;
+		pauseInfo.style.display = 'block';
+		updatePauseDisplay();
+
+		pauseTimer = setInterval(() => {
+			if (!isPausedManually && !isStopped) {
+				pauseCountdownSeconds--;
+				totalPauseSeconds++;
+				updatePauseDisplay();
+				updateTotalPauseDisplay();
+				if (pauseCountdownSeconds <= 0) endAutoPause();
+			}
+		}, 1000);
+	}
+
+	function endAutoPause() {
+		clearInterval(pauseTimer);
+		pauseInfo.style.display = 'none';
+		isInAutoPause = false;
+	}
+
+	// === BUTTON HANDLUNG ===
+	document.getElementById('startBtn').addEventListener('click', () => {
+		isPausedManually = false;
+		manualPauseStartSeconds = null;
+		manualPauseInfo.style.display = 'none';
+		isStopped = false;
+		updateBorderState();
+		startMainTimer();
+	});
+
+	document.getElementById('pauseBtn').addEventListener('click', () => {
+		if (isStopped) {
+			isStopped = false;
+			isPausedManually = true;
+			manualPauseStartSeconds = totalPauseSeconds;
+			manualPauseInfo.style.display = 'block';
+			startMainTimer();
+		} else {
+			isPausedManually = !isPausedManually;
+			if (isPausedManually) {
+				manualPauseStartSeconds = totalPauseSeconds;
+				manualPauseInfo.style.display = 'block';
+			} else {
+				manualPauseStartSeconds = null;
+				manualPauseInfo.style.display = 'none';
+			}
+		}
+		updateBorderState();
+	});
+
+	document.getElementById('stopBtn').addEventListener('click', () => {
+		isStopped = !isStopped;
+		updateBorderState();
+	});
+
+	// === BORDER-STATUS ===
+	function updateBorderState() {
+		screenArea.classList.remove('start-glow', 'stopped', 'paused');
+
+		if (isStopped) {
+			screenArea.classList.add('stopped');
+		} else if (isPausedManually) {
+			screenArea.classList.add('paused');
+		} else {
+			screenArea.classList.add('start-glow');
+			setTimeout(() => screenArea.classList.remove('start-glow'), 600);
+		}
+	}
+
+	// === POPUPS ===
+	function showDrinkReminder() {
+		document.getElementById('drinkReminderPopup').style.display = 'flex';
+		playDrinkReminderSound();
+	}
+
+	function closeDrinkReminder() {
+		document.getElementById('drinkReminderPopup').style.display = 'none';
+	}
+
+	function showBigBreakPopup() {
+		document.getElementById('bigBreakPopup').style.display = 'flex';
+		playBigBreakSound();
+	}
+
+	function closeBigBreakPopup() {
+		document.getElementById('bigBreakPopup').style.display = 'none';
+	}
+
+	// === Sounds ===
+	function playDrinkReminderSound() {
+		const audio = document.getElementById('drinkAudio');
+		audio.currentTime = 0;
+		audio.play();
+	}
+
+	function playBigBreakSound() {
+		const audio = document.getElementById('pauseAudio');
+		audio.currentTime = 0;
+		audio.play();
+	}
+
+
+	// === SENSORWERTE & ALERTS ===
+	function updateClimateIndicator(co2) {
+		const bar = document.getElementById('climateBar');
+		const indicator = document.getElementById('climate-indicator');
+		const clamped = Math.min(Math.max(co2, CLIMATE_MIN_CO2), CLIMATE_MAX_CO2);
+		const percent = (clamped - CLIMATE_MIN_CO2) / (CLIMATE_MAX_CO2 - CLIMATE_MIN_CO2);
+		indicator.style.left = `${percent * bar.offsetWidth}px`;
+	}
+
+	function updateAlertIcons(temp, co2, hum) {
+		const alertIcons = document.getElementById('alertIcons');
+		alertIcons.innerHTML = '';
+		if (co2 > CO2_LIMIT) alertIcons.innerHTML += '<div class="alert-icon">💨</div>';
+		if (temp < TEMP_MIN || temp > TEMP_MAX) alertIcons.innerHTML += '<div class="alert-icon">🌡️</div>';
+		if (hum < HUM_MIN || hum > HUM_MAX) alertIcons.innerHTML += '<div class="alert-icon">💧</div>';
+	}
+
+    // Optimalbereiche für Raumklima
+    const optimal = {
+        co2: [CLIMATE_MIN_CO2, CLIMATE_MAX_CO2],
+        temp: [TEMP_MIN, TEMP_MAX],
+        hum:  [HUM_MIN, HUM_MAX],
+    };
+
+    // Prozentuale Abweichung vom Idealbereich berechnen
+    function deviationPercent([min, max]) {
+        const center = (min + max) / 2;
+        const range = (max - min) / 2;
+        if (value >= min && value <= max) return 0;
+        return Math.min(100, Math.abs(value - center) / range * 100);
+    }
+
+    // Raumklimaindex berechnen (0 = perfekt, 100 = schlecht)
+    function calculateClimateIndex(co2, temp, hum) {
+        const dCo2  = deviationPercent(co2, optimal.co2);
+        const dTemp = deviationPercent(temp, optimal.temp);
+        const dHum  = deviationPercent(hum, optimal.hum);
+        return ((dCo2 + dTemp + dHum) / 3).toFixed(1); // gerundet auf 1 Nachkommastelle
+    }
+
+
+	// === INITIALISIERUNG ===
+	if (!SHOW_SENSOR_VALUES) {
+		document.getElementById('sensorValues').style.display = 'none';
+	}
+
+	setInterval(() => {
+		if (!isStopped) showDrinkReminder();
+	}, DRINK_REMINDER_INTERVAL_MINUTES * 60 * 1000);
+
+	async function fetchSensorDataFromThingSpeak() {
+	try {
+		const response = await fetch("https://api.thingspeak.com/channels/2986943/feeds.json?api_key=3WODICYF4YWUDO9F&results=1");
+		const data = await response.json();
+		const latest = data.feeds[0];
+
+		const temp = parseFloat(latest.field1);
+		const hum = parseFloat(latest.field2);
+		const co2 = parseFloat(latest.field3);
+
+
+		// Werte in HTML anzeigen
+		document.getElementById('co2').textContent = `${co2.toFixed(0)} ppm`;
+		document.getElementById('temp').textContent = `${temp.toFixed(1)} °C`;
+		document.getElementById('hum').textContent = `${hum.toFixed(0)} %`;
+
+		updateClimateIndicator(co2);
+		updateAlertIcons(temp, co2, hum);
+
+	} catch (error) {
+		console.error("Fehler beim Laden von ThingSpeak-Daten:", error);
+	}
+}
+
+	// Jede Sekunde neue Sensordaten abrufen
+	setInterval(fetchSensorDataFromThingSpeak, 1000);
+
+</script>
