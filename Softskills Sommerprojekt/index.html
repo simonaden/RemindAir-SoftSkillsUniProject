@@ -14,7 +14,7 @@
 		}
 		.screen-area {
 			width: 780px;
-			height: 480px;
+			height: 440px;
 			background: black;
 			margin: 0 auto;
 			position: relative;
@@ -26,6 +26,7 @@
 			border: 5px solid black;
             border-radius: 16px;
 			transition: border-color 0.3s ease;
+			transition: height 0.5s ease;
 		}
 		.screen-area.start-glow {
 			border-radius: 16px;
@@ -38,6 +39,11 @@
 		.screen-area.paused {
 			border-radius: 16px;
 			border-color: yellow;
+		}
+		.screen-area.collapsed {
+			height: 400px;
+			overflow: hidden;
+			transition: height 0.5s ease;
 		}
 		.top-bar {
 			width: 80%;
@@ -78,15 +84,21 @@
 		}
 		#screenTime {
 			font-size: 94px;
-			margin-top: 12%;
-			align-items: center;
-		}
+			position: absolute;
+						left: 50%;
+			transform: translateX(-50%);
+			bottom: 170px;
+			width: 100%;
+		}	
 		.progress-bar {
 			width: 90%;
 			height: 2dvh;
 			background: #444;
 			border-radius: 10px;
-			margin: 10px auto;
+			position: absolute;
+			left: 50%;
+			transform: translateX(-50%);
+			bottom: 160px;
 			overflow: hidden;
 		}
 		#progressFill {
@@ -96,16 +108,23 @@
 			transition: width 0.5s, background-color 0.5s;
 		}
 		#pauseInfo {
-			margin-top: 10px;
+			margin-top: 20px;
 			font-size: 24px;
 			color: #39ba28;
 			display: none;
+			position: absolute;
+			left: 50%;
+			transform: translateX(-50%);
+			bottom: 110px;
 		}
 		#manualPauseInfo {
 			display: none;
 			color: yellow;
 			font-size: 18px;
-			margin-top: 5px;
+			position: absolute;
+			left: 50%;
+			transform: translateX(-50%);
+			bottom: 80px;
 		}
 		#totalPauseTimeDisplay {
 			position: absolute;
@@ -118,9 +137,41 @@
 			margin: 20px auto;
 		}
 		button {
-			margin: 5px;
-			padding: 10px 20px;
+			width: 200px;
+			padding: 14px 28px;
+			margin: 10px;
 			font-size: 16px;
+			font-weight: 600;
+			color: #fff;
+			background: black;
+			border: none;
+			outline: none;
+			border-radius: 12px;
+			cursor: pointer;
+			transition: transform 0.2s ease,;
+		}
+		button:active {
+			transform: scale(0.96);
+		}
+		.controlBtn {
+			background: #000000;
+			width: 230px;
+			margin-top: 5px;
+			margin-bottom: 0px;
+			color: white;
+			font-size: 20px;
+			font-weight: bold;
+		}
+		#toggleHeightBtn {
+			transition: all 0.5s ease ;
+			width: 800px;
+			margin: 0px;
+			font-size: 20px;
+		}
+		#toggleHeightBtn.small{
+			height: 20px;
+			padding: 0px;
+			border-radius: 12px;
 		}
 		.alert-icons {
 			position: absolute;
@@ -156,9 +207,11 @@
 		}
 	</style>
 </head>
-<!-- Audio files for reminders -->
+
+
 <audio id="drinkAudio" src="trink_sound.mp3" preload="none"></audio>
 <audio id="pauseAudio" src="pause_sound2.mp3" preload="none"></audio>
+
 
 <body>
 	<div class="screen-area">
@@ -190,21 +243,24 @@
 			<div id="screenTime">00h 00min 00s</div>
 			<div class="progress-bar"><div id="progressFill"></div></div>
 			<div id="pauseInfo">
-				Pause: <span id="pauseCountdown">05min 00s</span>
+				Pause: <span id="pauseCountdown"></span>
 			</div>
 			<div id="manualPauseInfo">
-				Manuelle Pause seit: <span id="manualPauseTime">00h 00min 00s</span>
+				Manuelle Pause seit: <span id="manualPauseTime">0s</span>
 			</div>
 		</div>
 		<div class="alert-icons" id="alertIcons"></div>
 		<div id="totalPauseTimeDisplay">
-			Gesamte Pausenzeit: <span id="totalPauseTime">00h 00min 00s</span>
+			Gesamte Pausenzeit: <span id="totalPauseTime">0s</span>
 		</div>
 	</div>
-	<div class="buttons">
-		<button id="startBtn">Start</button>
-		<button id="pauseBtn">Pause</button>
-		<button id="stopBtn">Stopp</button>
+	<div>
+		<button id="toggleHeightBtn">+</button>
+	</div>
+	<div class="bottom_buttons">
+		<button class="controlBtn" id="startBtn">Start</button>
+		<button class="controlBtn" id="pauseBtn">Pause</button>
+		<button class="controlBtn" id="stopBtn">Stopp</button>
 	</div>
 </body>
 </html>
@@ -213,12 +269,12 @@
 <script>
 	// === KONSTANTEN ===
 	const SHOW_SENSOR_VALUES = true;
-	const PAUSE_INTERVAL_MINUTES = 0.2;
+	const FOKUS_LENGHT_MINUTES = 1;
 	const PAUSE_DURATION_MINUTES = 0.1;
 	const UPDATE_INTERVAL_MS = 1000;
 	const DRINK_REMINDER_INTERVAL_MINUTES = 30;
 
-	const BIG_BREAK_AFTER_N_PAUSES = 1;
+	const BIG_BREAK_AFTER_N_PAUSES = 2;
 	const BIG_BREAK_DURATION_SECONDS = PAUSE_DURATION_MINUTES * 5 * 60;
 
 	const CLIMATE_MIN_CO2 = 400;
@@ -229,7 +285,7 @@
 	const HUM_MIN = 30;
 	const HUM_MAX = 60;
 
-	const PAUSE_INTERVAL_SECONDS = PAUSE_INTERVAL_MINUTES * 60;
+	const FOKUS_LENGTH_SECONDS = FOKUS_LENGHT_MINUTES * 60;
 	const PAUSE_DURATION_SECONDS = PAUSE_DURATION_MINUTES * 60;
 	const PAUSE_TEXT_PREFIX = "Pause: ";
 
@@ -242,7 +298,6 @@
 	let totalPauseSeconds = 0;
 	let pauseCount = 0;
 	let manualPauseStartSeconds = null;
-
 	let mainTimer = null;
 	let pauseTimer = null;
 
@@ -259,13 +314,13 @@
 		const h = String(Math.floor(seconds / 3600)).padStart(2, '0');
 		const m = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
 		const s = String(seconds % 60).padStart(2, '0');
-		return `${h}h ${m}min ${s}s`;
-	}
-
-	function formatPauseTime(seconds) {
-		const m = String(Math.floor(seconds / 60)).padStart(2, '0');
-		const s = String(seconds % 60).padStart(2, '0');
-		return `${m}min ${s}s`;
+		if (m == 0 && h == 0) {
+			return `${s}s`;
+		}else if (m>0 && h == 0) {
+			return `${m}m ${s}s`;
+		}else {
+			return `${h}h ${m}m ${s}s`;
+		}
 	}
 
 	function updateScreenTimeDisplay() {
@@ -273,7 +328,7 @@
 	}
 
 	function updateProgressBar() {
-		const percent = Math.min((screenSeconds % PAUSE_INTERVAL_SECONDS) / PAUSE_INTERVAL_SECONDS * 100, 100);
+		const percent = Math.min((screenSeconds % FOKUS_LENGTH_SECONDS) / FOKUS_LENGTH_SECONDS * 100, 100);
 		progressFill.style.width = `${percent}%`;
 		progressFill.style.backgroundColor =
 			percent < 50 ? '#00e676' :
@@ -285,7 +340,7 @@
 	}
 
 	function updatePauseDisplay() {
-		pauseInfo.innerHTML = PAUSE_TEXT_PREFIX + '<span id="pauseCountdown">' + formatPauseTime(pauseCountdownSeconds) + '</span>';
+		pauseInfo.innerHTML = PAUSE_TEXT_PREFIX + '<span id="pauseCountdown">' + formatTime(pauseCountdownSeconds) + '</span>';
 	}
 
 	function updateStoppedBorder() {
@@ -305,7 +360,7 @@
 				screenSeconds++;
 				updateScreenTimeDisplay();
 				updateProgressBar();
-				if (screenSeconds > 0 && screenSeconds % PAUSE_INTERVAL_SECONDS === 0) {
+				if (screenSeconds > 0 && screenSeconds % FOKUS_LENGTH_SECONDS === 0) {
 					startAutoPause();
 				}
 			}
@@ -364,6 +419,7 @@
 		isStopped = false;
 		updateBorderState();
 		startMainTimer();
+		toogleHeight();
 	});
 
 	document.getElementById('pauseBtn').addEventListener('click', () => {
@@ -384,11 +440,13 @@
 			}
 		}
 		updateBorderState();
+		toogleHeight();
 	});
 
 	document.getElementById('stopBtn').addEventListener('click', () => {
 		isStopped = !isStopped;
 		updateBorderState();
+		toogleHeight();
 	});
 
 	// === BORDER-STATUS ===
@@ -489,30 +547,43 @@
 	}, DRINK_REMINDER_INTERVAL_MINUTES * 60 * 1000);
 
 	async function fetchSensorDataFromThingSpeak() {
-	try {
-		const response = await fetch("https://api.thingspeak.com/channels/2986943/feeds.json?api_key=3WODICYF4YWUDO9F&results=1");
-		const data = await response.json();
-		const latest = data.feeds[0];
+		try {
+			const response = await fetch("https://api.thingspeak.com/channels/2986943/feeds.json?api_key=3WODICYF4YWUDO9F&results=1");
+			const data = await response.json();
+			const latest = data.feeds[0];
 
-		const temp = parseFloat(latest.field1);
-		const hum = parseFloat(latest.field2);
-		const co2 = parseFloat(latest.field3);
+			const temp = parseFloat(latest.field1);
+			const hum = parseFloat(latest.field2);
+			const co2 = parseFloat(latest.field3);
 
 
-		// Werte in HTML anzeigen
-		document.getElementById('co2').textContent = `${co2.toFixed(0)} ppm`;
-		document.getElementById('temp').textContent = `${temp.toFixed(1)} °C`;
-		document.getElementById('hum').textContent = `${hum.toFixed(0)} %`;
+			// Werte in HTML anzeigen
+			document.getElementById('co2').textContent = `${co2.toFixed(0)} ppm`;
+			document.getElementById('temp').textContent = `${temp.toFixed(1)} °C`;
+			document.getElementById('hum').textContent = `${hum.toFixed(0)} %`;
 
-		updateClimateIndicator(co2);
-		updateAlertIcons(temp, co2, hum);
+			updateClimateIndicator(co2);
+			updateAlertIcons(temp, co2, hum);
 
-	} catch (error) {
-		console.error("Fehler beim Laden von ThingSpeak-Daten:", error);
+		} catch (error) {
+			console.error("Fehler beim Laden von ThingSpeak-Daten:", error);
+		}
 	}
-}
 
 	// Jede Sekunde neue Sensordaten abrufen
 	setInterval(fetchSensorDataFromThingSpeak, 1000);
 
+	// === Dynamische Größen ===
+	const toggleBtn = document.getElementById('toggleHeightBtn');
+	let isCollapsed = false;
+
+	toggleBtn.addEventListener('click', () => {
+		toogleHeight();
+	});
+	function toogleHeight(){
+		isCollapsed = !isCollapsed;
+		screenArea.classList.toggle('collapsed', isCollapsed);
+		toggleBtn.textContent = isCollapsed ? "-" : "+";
+		toggleBtn.classList.toggle('small', isCollapsed);
+	}
 </script>
